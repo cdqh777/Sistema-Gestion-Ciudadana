@@ -1,0 +1,10 @@
+.gt-page { min-height: 100vh; background: var(--gris-fondo); }
+.gt-container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+.gt-header { display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+.gt-titulo { font-family: var(--font-display); font-size: 30px; color: var(--azul-oscuro); margin-bottom: 4px; }
+.gt-sub { color: var(--gris-texto); font-size: 14px; }
+.gt-form-card { background: white; border-radius: 12px; padding: 28px; box-shadow: var(--sombra);
+  margin-bottom: 24px; border-top: 4px solid var(--azul-brillante); }
+.gt-form-titulo { font-family: var(--font-display); font-size: 20px; color: var(--azul-oscuro); margin-bottom: 20px; }
+.gt-card { background: white; border-radius: 12px; box-shadow: var(--sombra); overflow: hidden; }

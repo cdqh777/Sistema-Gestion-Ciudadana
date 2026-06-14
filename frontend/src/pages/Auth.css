@@ -1,0 +1,48 @@
+.auth-page { min-height: 100vh; display: flex; }
+
+.auth-left {
+  width: 420px; flex-shrink: 0;
+  background: var(--azul-oscuro);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 40px; position: relative; overflow: hidden;
+}
+.auth-left::before {
+  content: ''; position: absolute; top: -80px; right: -80px;
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, rgba(200,147,42,.18), transparent 70%);
+}
+.auth-left-content { position: relative; z-index: 1; }
+
+.auth-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+.auth-brand h1 { font-family: var(--font-display); font-size: 28px; color: white; line-height: 1.15; }
+.auth-brand h1 span { color: var(--dorado-claro); }
+.auth-left-desc { color: rgba(255,255,255,.55); font-size: 15px; line-height: 1.7; margin-bottom: 28px; }
+
+.auth-demo-box {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px; padding: 16px;
+}
+.auth-demo-titulo { color: var(--dorado-claro); font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+.auth-demo-item { font-size: 13px; color: rgba(255,255,255,.65); margin-bottom: 6px; }
+.auth-demo-item span { color: rgba(255,255,255,.4); margin-right: 4px; }
+.auth-demo-item code { background: rgba(255,255,255,.12); padding: 1px 6px; border-radius: 4px;
+  color: var(--dorado-claro); font-size: 12px; }
+
+.auth-right {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 40px 24px; background: var(--gris-fondo); overflow-y: auto;
+}
+.auth-box {
+  background: white; border-radius: 16px; padding: 40px 36px;
+  box-shadow: var(--sombra); width: 100%; max-width: 440px;
+}
+.auth-titulo { font-family: var(--font-display); font-size: 28px; color: var(--azul-oscuro); margin-bottom: 6px; }
+.auth-sub { color: var(--gris-texto); font-size: 14px; margin-bottom: 28px; }
+.auth-btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; margin-top: 8px; }
+.auth-btn:disabled { opacity: .6; cursor: not-allowed; }
+.auth-footer-link { text-align: center; margin-top: 20px; font-size: 14px; color: var(--gris-texto); }
+.auth-footer-link a { color: var(--azul-brillante); font-weight: 500; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+@media(max-width:900px) { .auth-left { display: none; } }

@@ -1,0 +1,64 @@
+.aut-page { min-height: 100vh; background: var(--gris-fondo); }
+
+.aut-container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+.aut-header {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 28px;
+}
+.aut-header > div:last-child { align-self: flex-end; margin-top: -60px; }
+
+.aut-header-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, var(--azul-oscuro), var(--azul-medio));
+  color: var(--dorado-claro); font-size: 12px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 20px;
+  width: fit-content;
+}
+
+.aut-titulo {
+  font-family: var(--font-display); font-size: 28px;
+  color: var(--azul-oscuro); margin-bottom: 4px;
+}
+.aut-sub { color: var(--gris-texto); font-size: 14px; line-height: 1.5; }
+
+/* ── KPIs ── */
+.aut-kpis {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-bottom: 20px;
+}
+@media(max-width: 700px) { .aut-kpis { grid-template-columns: 1fr; } }
+
+.aut-kpi {
+  background: white; border-radius: 12px; padding: 22px 24px;
+  box-shadow: var(--sombra); border-left: 5px solid transparent;
+}
+.aut-kpi-revision   { border-left-color: #2563EB; }
+.aut-kpi-aprobadas  { border-left-color: #16A34A; }
+.aut-kpi-rechazadas { border-left-color: #DC2626; }
+
+.aut-kpi-num {
+  display: block; font-family: var(--font-display);
+  font-size: 44px; font-weight: 600; color: var(--azul-oscuro); line-height: 1;
+  margin-bottom: 6px;
+}
+.aut-kpi-label { font-size: 13px; color: var(--gris-texto); font-weight: 500; }
+
+/* ── BANNER ── */
+.aut-banner {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: #EFF6FF; border: 1.5px solid #BFDBFE;
+  border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;
+}
+.aut-banner span { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+.aut-banner p { font-size: 14px; color: #1E40AF; line-height: 1.6; }
+
+/* ── CARD / tabla ── */
+.aut-card { background: white; border-radius: 12px; box-shadow: var(--sombra); overflow: hidden; }
+
+/* reutiliza .tabs-header, .tab-btn, .busqueda-input, .tabla del index.css */
+.td-obs {
+  font-size: 13px; color: var(--gris-texto);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

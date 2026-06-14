@@ -1,0 +1,12 @@
+.registro-page { padding: 40px 24px; background: var(--gris-fondo); min-height: 100vh; }
+.registro-box {
+  background: white; border-radius: 16px; padding: 40px 36px;
+  box-shadow: var(--sombra); max-width: 620px; margin: 0 auto;
+}
+.opcion-check { margin: 4px 0 12px; }
+.check-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; font-weight: 500; }
+.check-label input { width: 18px; height: 18px; accent-color: var(--azul-medio); }
+.bloque-extra {
+  background: var(--gris-fondo); border-radius: 10px; padding: 16px;
+  margin-bottom: 16px; border-left: 3px solid var(--azul-brillante);
+}
