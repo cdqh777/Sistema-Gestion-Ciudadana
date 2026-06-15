@@ -7,7 +7,7 @@ Sistema web completo (Node.js + React + MySQL) para la Municipalidad de La Paz. 
 ## 🗃️ Base de Datos — MySQL
 
 > **Nombre de la BD:** `GestionTramitesMunicipales`  
-> El archivo `db.sql` contiene el script completo para crear todas las tablas e insertar datos de prueba.
+> El archivo `dbsisgestmun.sql` contiene el script completo para crear todas las tablas e insertar datos de prueba.
 
 ### Esquema de tablas
 
@@ -17,7 +17,8 @@ Sistema web completo (Node.js + React + MySQL) para la Municipalidad de La Paz. 
 | `CIUDADANO` | Perfil extendido del ciudadano (FK → USUARIO) |
 | `FUNCIONARIO` | Cargo y departamento del funcionario (FK → USUARIO) |
 | `AUTORIDAD` | Autoridades que pueden firmar documentos (FK → USUARIO) |
-| `TRAMITE` | Catálogo de trámites disponibles (gestionado por funcionarios) |
+| `GESTOR_UMSA` | Gestores académicos de la UMSA (FK → USUARIO) |
+| `TRAMITE` | Catálogo de trámites disponibles (municipal/umsa/convenio) |
 | `SOLICITUD` | Solicitudes enviadas por ciudadanos, con estado y observación |
 | `PAGO` | Registro de pagos por solicitud |
 | `COMPROBANTE` | Comprobante generado al pagar |
@@ -25,6 +26,13 @@ Sistema web completo (Node.js + React + MySQL) para la Municipalidad de La Paz. 
 | `PRODUCE` | Relación SOLICITUD ↔ DOCUMENTO |
 | `DESCARGA` | Registro de descargas de documentos por ciudadanos |
 | `FIRMA` | Registro de firmas de documentos por autoridades |
+| `HISTORIAL_ESTADO` | Trazabilidad de cambios de estado en solicitudes |
+| `FACULTAD_UMSA` | Facultades de la Universidad Mayor de San Andrés |
+| `CARRERA_UMSA` | Carreras universitarias por facultad |
+| `CONVENIO` | Convenios interinstitucionales UMSA-Municipalidad |
+| `PARTE_CONVENIO` | Partes firmantes de cada convenio |
+| `PRACTICA` | Prácticas pre-profesionales de estudiantes UMSA |
+| `FLUJO_TRAMITE` | Ruta interinstitucional de cada tipo de trámite |
 
 ### Roles y cuentas de demo
 
@@ -35,6 +43,7 @@ Sistema web completo (Node.js + React + MySQL) para la Municipalidad de La Paz. 
 | Funcionario | `3102987` | `func456` | Panel funcionario |
 | Jefa / Autoridad | `2845610` | `func456` | Panel funcionario + firma |
 | Director | `1983047` | `dir789` | Panel funcionario (autoridad) |
+| Gestor UMSA | `7755001` | `func456` | Panel gestor UMSA |
 
 ---
 
@@ -65,9 +74,9 @@ Abre MySQL Workbench o tu terminal MySQL y ejecuta:
 
 ```sql
 -- Opción A: ejecutar el archivo completo
-SOURCE /ruta/a/db.sql;
+SOURCE /ruta/a/dbsisgestmun.sql;
 
--- Opción B: copiar y pegar el contenido de db.sql en tu cliente MySQL
+-- Opción B: copiar y pegar el contenido de dbsisgestmun.sql en tu cliente MySQL
 ```
 
 Esto crea automáticamente la base de datos `GestionTramitesMunicipales` con todas las tablas y datos de prueba.
@@ -136,7 +145,7 @@ npm run dev
 ```
 municipalidad-lapaz/
 │
-├── db.sql                          ← Script completo de la base de datos
+├── dbsisgestmun.sql                ← Script completo de la base de datos
 │
 ├── backend/
 │   ├── .env                        ← Variables de entorno (crear manualmente)

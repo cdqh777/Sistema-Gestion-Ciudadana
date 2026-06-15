@@ -9,7 +9,7 @@ const pool = mysql2.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   charset: 'utf8mb4',
-});
+}); 
 
 pool.getConnection()
   .then(conn => { console.log('✅ MySQL conectado'); conn.release(); })
