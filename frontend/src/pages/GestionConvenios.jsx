@@ -1,162 +1,415 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { API } from '../context/AuthContext';
 import Header from '../components/layout/Header';
-import './GestionTramites.css';
+import './GestionConvenios.css';
+
+const formularioInicial = {
+  titulo: '',
+  tipo: 'especifico',
+  descripcion: '',
+  fechaInicio: '',
+  fechaFin: '',
+  partes: [
+    { entidad: 'UMSA', representante: '', cargo: '' },
+    { entidad: 'Municipio', representante: '', cargo: '' },
+  ],
+};
+
+function formatearFecha(fecha) {
+  if (!fecha) return 'Sin fecha';
+  const fechaConvertida = new Date(fecha);
+  if (Number.isNaN(fechaConvertida.getTime())) return 'Sin fecha';
+  return fechaConvertida.toLocaleDateString('es-BO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function obtenerEstadoVigencia(convenio) {
+  if (convenio.estado !== 'activo') return convenio.estado || 'sin estado';
+  if (!convenio.fechaFin) return 'activo';
+
+  const hoy = new Date();
+  const fin = new Date(convenio.fechaFin);
+  return fin >= hoy ? 'activo' : 'vencido';
+}
+
+function obtenerClaseEstado(estado) {
+  if (estado === 'activo') return 'activo';
+  if (estado === 'vencido') return 'vencido';
+  return 'inactivo';
+}
+
+function contarPorEstado(convenios) {
+  return convenios.reduce(
+    (acumulador, convenio) => {
+      const estado = obtenerEstadoVigencia(convenio);
+      if (estado === 'activo') acumulador.activos += 1;
+      else if (estado === 'vencido') acumulador.vencidos += 1;
+      else acumulador.inactivos += 1;
+      return acumulador;
+    },
+    { activos: 0, vencidos: 0, inactivos: 0 }
+  );
+}
 
 export default function GestionConvenios() {
   const [convenios, setConvenios] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({
-    titulo: '', tipo: 'especifico', descripcion: '',
-    fechaInicio: '', fechaFin: '',
-    partes: [{ entidad: 'UMSA', representante: '', cargo: '' }],
-  });
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [convenioSeleccionado, setConvenioSeleccionado] = useState(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [formulario, setFormulario] = useState(formularioInicial);
+
+  async function cargarConvenios() {
+    try {
+      setCargando(true);
+      const respuesta = await axios.get(`${API}/umsa/convenios`);
+      setConvenios(Array.isArray(respuesta.data) ? respuesta.data : []);
+    } catch (error) {
+      toast.error(error.response?.data?.mensaje || 'No se pudieron cargar los convenios');
+      setConvenios([]);
+    } finally {
+      setCargando(false);
+    }
+  }
 
   useEffect(() => {
-    axios.get(`${API}/umsa/convenios`)
-      .then(r => setConvenios(r.data))
-      .catch(() => {})
-      .finally(() => setCargando(false));
+    cargarConvenios();
   }, []);
 
-  const chForm = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+  const estadisticas = useMemo(() => {
+    const estados = contarPorEstado(convenios);
+    return {
+      total: convenios.length,
+      marco: convenios.filter(convenio => convenio.tipo === 'marco').length,
+      especificos: convenios.filter(convenio => convenio.tipo === 'especifico').length,
+      activos: estados.activos,
+      vencidos: estados.vencidos,
+    };
+  }, [convenios]);
 
-  const addParte = () => {
-    const entidadNueva = form.partes.length % 2 === 0 ? 'UMSA' : 'Municipio';
-    setForm(p => ({ ...p, partes: [...p.partes, { entidad: entidadNueva, representante: '', cargo: '' }] }));
-  };
+  const conveniosFiltrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
 
-  const chParte = (i, campo, val) => {
-    const partes = [...form.partes];
-    partes[i][campo] = val;
-    setForm(p => ({ ...p, partes }));
-  };
+    return convenios.filter(convenio => {
+      const coincideTipo = filtroTipo === 'todos' || convenio.tipo === filtroTipo;
+      const contenido = `${convenio.titulo || ''} ${convenio.descripcion || ''} ${convenio.estado || ''}`.toLowerCase();
+      const coincideBusqueda = !texto || contenido.includes(texto);
+      return coincideTipo && coincideBusqueda;
+    });
+  }, [convenios, busqueda, filtroTipo]);
 
-  const submit = async e => {
-    e.preventDefault();
-    if (!form.titulo || !form.fechaInicio) return toast.error('Título y fecha requeridos');
-    try {
-      await axios.post(`${API}/umsa/convenios`, form);
-      toast.success('Convenio creado');
-      setMostrarForm(false);
-      setForm({ titulo: '', tipo: 'especifico', descripcion: '', fechaInicio: '', fechaFin: '', partes: [{ entidad: 'UMSA', representante: '', cargo: '' }] });
-      const r = await axios.get(`${API}/umsa/convenios`);
-      setConvenios(r.data);
-    } catch (err) {
-      toast.error(err.response?.data?.mensaje || 'Error');
+  function cambiarFormulario(evento) {
+    const { name, value } = evento.target;
+    setFormulario(actual => ({ ...actual, [name]: value }));
+  }
+
+  function agregarParte() {
+    const siguienteEntidad = formulario.partes.length % 2 === 0 ? 'UMSA' : 'Municipio';
+    setFormulario(actual => ({
+      ...actual,
+      partes: [...actual.partes, { entidad: siguienteEntidad, representante: '', cargo: '' }],
+    }));
+  }
+
+  function modificarParte(indice, campo, valor) {
+    const partes = formulario.partes.map((parte, posicion) => (
+      posicion === indice ? { ...parte, [campo]: valor } : parte
+    ));
+    setFormulario(actual => ({ ...actual, partes }));
+  }
+
+  function eliminarParte(indice) {
+    setFormulario(actual => ({
+      ...actual,
+      partes: actual.partes.filter((_, posicion) => posicion !== indice),
+    }));
+  }
+
+  function limpiarFormulario() {
+    setFormulario(formularioInicial);
+    setMostrarFormulario(false);
+  }
+
+  async function registrarConvenio(evento) {
+    evento.preventDefault();
+
+    if (!formulario.titulo.trim()) {
+      toast.error('Ingrese el título del convenio');
+      return;
     }
-  };
+
+    if (!formulario.fechaInicio) {
+      toast.error('Seleccione la fecha de inicio');
+      return;
+    }
+
+    const partesValidas = formulario.partes.filter(parte => (
+      parte.entidad && parte.representante.trim() && parte.cargo.trim()
+    ));
+
+    if (partesValidas.length < 2) {
+      toast.error('Registre al menos una parte UMSA y una parte Municipio');
+      return;
+    }
+
+    try {
+      await axios.post(`${API}/umsa/convenios`, {
+        ...formulario,
+        titulo: formulario.titulo.trim(),
+        descripcion: formulario.descripcion.trim(),
+        fechaFin: formulario.fechaFin || null,
+        partes: partesValidas,
+      });
+
+      toast.success('Convenio creado correctamente');
+      limpiarFormulario();
+      cargarConvenios();
+    } catch (error) {
+      toast.error(error.response?.data?.mensaje || 'Error al crear el convenio');
+    }
+  }
+
+  function alternarDetalle(convenio) {
+    setConvenioSeleccionado(actual => (
+      actual?.idConvenio === convenio.idConvenio ? null : convenio
+    ));
+  }
 
   return (
     <>
       <Header />
-      <div className="tramites-page">
-        <div className="tramites-header">
-          <div>
-            <h1>🤝 Convenios UMSA - Municipalidad</h1>
-            <p>Gestión de convenios marco y específicos</p>
+
+      <main className="convenios-page">
+        <section className="convenios-hero">
+          <div className="convenios-hero-info">
+            <span className="convenios-etiqueta">Gestión interinstitucional</span>
+            <h1>Convenios UMSA - Municipalidad</h1>
+            <p>
+              Registro y seguimiento de convenios marco, convenios específicos y partes firmantes
+              entre la Universidad Mayor de San Andrés y el Gobierno Autónomo Municipal de La Paz.
+            </p>
           </div>
-          <button className="btn btn-primary" onClick={() => setMostrarForm(p => !p)}>
-            {mostrarForm ? '✕ Cancelar' : '+ Nuevo Convenio'}
+
+          <button
+            type="button"
+            className="btn btn-primary convenios-btn-nuevo"
+            onClick={() => setMostrarFormulario(actual => !actual)}
+          >
+            {mostrarFormulario ? '✕ Cancelar registro' : '+ Nuevo convenio'}
           </button>
-        </div>
+        </section>
 
-        {mostrarForm && (
-          <form onSubmit={submit} className="tramite-form">
-            <div className="form-row">
-              <div className="form-group" style={{ flex: 2 }}>
-                <label>Título *</label>
-                <input name="titulo" value={form.titulo} onChange={chForm} placeholder="Título del convenio" />
+        <section className="convenios-resumen">
+          <article className="convenio-stat">
+            <span>Total</span>
+            <strong>{estadisticas.total}</strong>
+            <small>convenios registrados</small>
+          </article>
+          <article className="convenio-stat">
+            <span>Marco</span>
+            <strong>{estadisticas.marco}</strong>
+            <small>cooperación general</small>
+          </article>
+          <article className="convenio-stat">
+            <span>Específicos</span>
+            <strong>{estadisticas.especificos}</strong>
+            <small>acciones concretas</small>
+          </article>
+          <article className="convenio-stat">
+            <span>Activos</span>
+            <strong>{estadisticas.activos}</strong>
+            <small>vigentes actualmente</small>
+          </article>
+        </section>
+
+        {mostrarFormulario && (
+          <form onSubmit={registrarConvenio} className="convenios-formulario">
+            <div className="convenios-form-header">
+              <div>
+                <span>Nuevo registro</span>
+                <h2>Datos del convenio</h2>
               </div>
-              <div className="form-group">
-                <label>Tipo</label>
-                <select name="tipo" value={form.tipo} onChange={chForm}>
-                  <option value="marco">Marco</option>
-                  <option value="especifico">Específico</option>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={limpiarFormulario}>
+                Limpiar
+              </button>
+            </div>
+
+            <div className="convenios-grid-form">
+              <label className="campo ancho-doble">
+                <span>Título *</span>
+                <input
+                  name="titulo"
+                  value={formulario.titulo}
+                  onChange={cambiarFormulario}
+                  placeholder="Ej. Convenio de prácticas preprofesionales"
+                />
+              </label>
+
+              <label className="campo">
+                <span>Tipo</span>
+                <select name="tipo" value={formulario.tipo} onChange={cambiarFormulario}>
+                  <option value="marco">Convenio marco</option>
+                  <option value="especifico">Convenio específico</option>
                 </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Descripción</label>
-              <textarea name="descripcion" value={form.descripcion} onChange={chForm} rows={3} />
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Fecha de Inicio *</label>
-                <input name="fechaInicio" type="date" value={form.fechaInicio} onChange={chForm} />
-              </div>
-              <div className="form-group">
-                <label>Fecha de Fin</label>
-                <input name="fechaFin" type="date" value={form.fechaFin} onChange={chForm} />
-              </div>
+              </label>
+
+              <label className="campo">
+                <span>Fecha de inicio *</span>
+                <input name="fechaInicio" type="date" value={formulario.fechaInicio} onChange={cambiarFormulario} />
+              </label>
+
+              <label className="campo">
+                <span>Fecha de finalización</span>
+                <input name="fechaFin" type="date" value={formulario.fechaFin} onChange={cambiarFormulario} />
+              </label>
+
+              <label className="campo ancho-completo">
+                <span>Descripción</span>
+                <textarea
+                  name="descripcion"
+                  value={formulario.descripcion}
+                  onChange={cambiarFormulario}
+                  rows={4}
+                  placeholder="Describa el alcance, finalidad y actividades principales del convenio"
+                />
+              </label>
             </div>
 
-            <div className="form-group">
-              <label>Partes firmantes</label>
-              {form.partes.map((p, i) => (
-                <div key={i} className="form-row" style={{ marginBottom: 8, alignItems: 'end' }}>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    <select value={p.entidad} onChange={e => chParte(i, 'entidad', e.target.value)}>
+            <div className="partes-card">
+              <div className="partes-head">
+                <div>
+                  <span>Partes firmantes</span>
+                  <h3>Representantes institucionales</h3>
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={agregarParte}>
+                  + Agregar parte
+                </button>
+              </div>
+
+              <div className="partes-lista">
+                {formulario.partes.map((parte, indice) => (
+                  <div key={`${parte.entidad}-${indice}`} className="parte-fila">
+                    <select value={parte.entidad} onChange={evento => modificarParte(indice, 'entidad', evento.target.value)}>
                       <option value="UMSA">UMSA</option>
                       <option value="Municipio">Municipio</option>
                     </select>
+                    <input
+                      placeholder="Representante"
+                      value={parte.representante}
+                      onChange={evento => modificarParte(indice, 'representante', evento.target.value)}
+                    />
+                    <input
+                      placeholder="Cargo"
+                      value={parte.cargo}
+                      onChange={evento => modificarParte(indice, 'cargo', evento.target.value)}
+                    />
+                    {formulario.partes.length > 2 && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => eliminarParte(indice)}>
+                        ✕
+                      </button>
+                    )}
                   </div>
-                  <div className="form-group" style={{ flex: 2 }}>
-                    <input placeholder="Representante" value={p.representante} onChange={e => chParte(i, 'representante', e.target.value)} />
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    <input placeholder="Cargo" value={p.cargo} onChange={e => chParte(i, 'cargo', e.target.value)} />
-                  </div>
-                  {form.partes.length > 1 && (
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(p => ({ ...p, partes: p.partes.filter((_, j) => j !== i) }))}>
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button type="button" className="btn btn-ghost btn-sm" onClick={addParte}>+ Agregar parte</button>
+                ))}
+              </div>
             </div>
 
-            <button type="submit" className="btn btn-primary">Crear Convenio</button>
+            <div className="convenios-form-actions">
+              <button type="submit" className="btn btn-primary">Crear convenio</button>
+              <button type="button" className="btn btn-ghost" onClick={limpiarFormulario}>Cancelar</button>
+            </div>
           </form>
         )}
 
-        {cargando ? <div className="spinner" /> : convenios.length === 0 ? (
-          <div className="empty-state"><p>No hay convenios registrados.</p></div>
-        ) : (
-          <div className="tramites-table-wrapper">
-            <table className="tramites-table">
-              <thead>
-                <tr>
-                  <th>Título</th>
-                  <th>Tipo</th>
-                  <th>Inicio</th>
-                  <th>Fin</th>
-                  <th>Estado</th>
-                  <th>Partes</th>
-                  <th>Creado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {convenios.map(c => (
-                  <tr key={c.idConvenio}>
-                    <td><strong>{c.titulo}</strong></td>
-                    <td><span className={`badge ${c.tipo === 'marco' ? 'aceptado' : 'en_revision'}`}>{c.tipo}</span></td>
-                    <td>{new Date(c.fechaInicio).toLocaleDateString('es-BO')}</td>
-                    <td>{c.fechaFin ? new Date(c.fechaFin).toLocaleDateString('es-BO') : '—'}</td>
-                    <td><span className={`badge ${c.estado === 'activo' ? 'aceptado' : 'rechazado'}`}>{c.estado}</span></td>
-                    <td>{c.partes?.map(p => `${p.entidad}: ${p.representante}`).join(', ') || '—'}</td>
-                    <td>{new Date(c.fechaCreacion).toLocaleDateString('es-BO')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className="convenios-panel">
+          <div className="convenios-panel-head">
+            <div>
+              <span>Listado</span>
+              <h2>Convenios registrados</h2>
+            </div>
+
+            <div className="convenios-filtros">
+              <input
+                value={busqueda}
+                onChange={evento => setBusqueda(evento.target.value)}
+                placeholder="Buscar por título, descripción o estado..."
+              />
+              <select value={filtroTipo} onChange={evento => setFiltroTipo(evento.target.value)}>
+                <option value="todos">Todos los tipos</option>
+                <option value="marco">Marco</option>
+                <option value="especifico">Específico</option>
+              </select>
+            </div>
           </div>
-        )}
-      </div>
+
+          {cargando ? (
+            <div className="spinner" />
+          ) : conveniosFiltrados.length === 0 ? (
+            <div className="convenios-vacio">
+              <strong>No hay convenios para mostrar</strong>
+              <p>Registre un nuevo convenio o cambie los filtros de búsqueda.</p>
+            </div>
+          ) : (
+            <div className="convenios-lista">
+              {conveniosFiltrados.map(convenio => {
+                const estadoVigencia = obtenerEstadoVigencia(convenio);
+                const seleccionado = convenioSeleccionado?.idConvenio === convenio.idConvenio;
+
+                return (
+                  <article key={convenio.idConvenio} className={`convenio-card ${seleccionado ? 'seleccionado' : ''}`}>
+                    <button type="button" className="convenio-card-main" onClick={() => alternarDetalle(convenio)}>
+                      <div className="convenio-icono">🤝</div>
+
+                      <div className="convenio-info">
+                        <div className="convenio-topline">
+                          <span className={`convenio-tipo tipo-${convenio.tipo}`}>{convenio.tipo}</span>
+                          <span className={`convenio-estado ${obtenerClaseEstado(estadoVigencia)}`}>{estadoVigencia}</span>
+                        </div>
+                        <h3>{convenio.titulo}</h3>
+                        <p>{convenio.descripcion || 'Sin descripción registrada.'}</p>
+                      </div>
+
+                      <div className="convenio-fechas">
+                        <span>Inicio</span>
+                        <strong>{formatearFecha(convenio.fechaInicio)}</strong>
+                        <span>Fin</span>
+                        <strong>{formatearFecha(convenio.fechaFin)}</strong>
+                      </div>
+                    </button>
+
+                    {seleccionado && (
+                      <div className="convenio-detalle">
+                        <div>
+                          <span className="detalle-label">Partes firmantes</span>
+                          <div className="partes-detalle">
+                            {convenio.partes?.length ? convenio.partes.map(parte => (
+                              <div key={parte.idParte || `${parte.entidad}-${parte.representante}`} className="parte-detalle-card">
+                                <strong>{parte.entidad}</strong>
+                                <span>{parte.representante || 'Sin representante'}</span>
+                                <small>{parte.cargo || 'Sin cargo'}</small>
+                              </div>
+                            )) : <p>No se registraron partes firmantes.</p>}
+                          </div>
+                        </div>
+
+                        <div className="detalle-meta">
+                          <p><strong>Creado:</strong> {formatearFecha(convenio.fechaCreacion)}</p>
+                          <p><strong>Registrado por:</strong> {convenio.creador_nombre || 'Funcionario municipal'}</p>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </main>
     </>
   );
 }

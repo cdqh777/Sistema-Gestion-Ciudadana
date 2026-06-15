@@ -4,8 +4,6 @@ import toast from 'react-hot-toast';
 import { API } from '../../context/AuthContext';
 import './VisorDocumentos.css';
 
-const BASE = '';
-
 export default function VisorDocumentos({ idSolicitud, tramite, onCerrar }) {
   const [docs, setDocs]       = useState([]);
   const [cargando, setCarg]   = useState(true);
@@ -27,7 +25,11 @@ export default function VisorDocumentos({ idSolicitud, tramite, onCerrar }) {
 
   const esImg = mime => mime?.startsWith('image/');
   const esPdf = mime => mime?.includes('pdf');
-  const url   = doc  => `/uploads/${doc.nombre}`;
+  const url = doc => {
+    const token = localStorage.getItem('muni_token') || '';
+    return `${API}/documentos/ver/${doc.idDoc}?token=${encodeURIComponent(token)}`;
+  };
+
 
   return (
     <div className="visor-overlay" onClick={e => e.target === e.currentTarget && onCerrar()}>

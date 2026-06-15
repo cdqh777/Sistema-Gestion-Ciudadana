@@ -223,3 +223,4 @@ municipalidad-lapaz/
 | PUT | `/api/tramites/:id` | Editar trámite | Funcionario |
 | DELETE | `/api/tramites/:id` | Eliminar trámite | Funcionario |
 | GET | `/api/documentos/solicitud/:id` | Docs de una solicitud | Autenticado |
+"# ProyAnalisis" 

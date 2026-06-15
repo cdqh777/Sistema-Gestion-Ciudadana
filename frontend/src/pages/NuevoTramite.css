@@ -136,3 +136,79 @@
 .nt-flujo-inst { display: block; font-weight: 700; font-size: 11px; color: #1E293B; }
 .nt-flujo-accion { display: block; font-size: 10px; color: #64748B; text-transform: capitalize; }
 .nt-flujo-arrow { color: #94A3B8; font-size: 14px; font-weight: 700; }
+
+/* ── AJUSTES SOLICITUD COMPLETA ── */
+.nt-header-box { margin-bottom: 26px; }
+.nt-pretitle {
+  color: var(--dorado);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 4px;
+}
+.nt-info-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.nt-info-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #BFDBFE;
+  color: var(--azul-oscuro);
+  font-size: 12px;
+  font-weight: 700;
+}
+.nt-info-costo {
+  color: var(--azul-oscuro);
+  font-size: 14px;
+  font-weight: 700;
+}
+.nt-requisitos-panel {
+  background: white;
+  border-radius: 10px;
+  padding: 14px 16px;
+  border: 1px solid #E2E8F0;
+  margin-top: 12px;
+}
+.nt-texto-suave { color: var(--gris-texto); font-size: 13px; }
+.nt-captcha-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.nt-botones-paso {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+.nt-botones-paso .btn-primary { flex: 1; justify-content: center; }
+.nt-qr-svg {
+  border: 8px solid white;
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--sombra);
+}
+@media(max-width:600px) {
+  .nt-botones-paso { flex-direction: column; }
+  .nt-captcha-form { flex-direction: column; }
+  .nt-captcha-input { width: 100%; }
+}
+
+.nt-qr-real {
+  width: min(260px, 100%);
+  max-height: 360px;
+  object-fit: contain;
+  border: 8px solid white;
+  border-radius: 12px;
+  background: white;
+  box-shadow: var(--sombra);
+}

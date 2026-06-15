@@ -14,6 +14,17 @@ const icono = mime => {
   return '📝';
 };
 
+const esComprobantePago = documento => {
+  const nombre = String(documento?.nombre || '').toLowerCase();
+  return nombre.includes('comprobante') || nombre.includes('pago') || nombre.includes('qr') || nombre.includes('transferencia');
+};
+
+
+const urlDocumento = documento => {
+  const token = localStorage.getItem('muni_token') || '';
+  return `${API}/documentos/ver/${documento.idDoc}?token=${encodeURIComponent(token)}`;
+};
+
 export default function DetalleSolicitud() {
   const { id }              = useParams();
   const navigate            = useNavigate();
@@ -50,6 +61,7 @@ export default function DetalleSolicitud() {
     : location.pathname.startsWith('/autoridad') ? '/autoridad' : '/funcionario';
 
   const estadoBadge = sol.estado === 'aprobada' ? 'aceptado' : sol.estado === 'rechazada' ? 'rechazado' : sol.estado;
+  const comprobantePago = sol.documentos?.find(esComprobantePago);
 
   return (
     <div className="detalle-page">
@@ -105,32 +117,7 @@ export default function DetalleSolicitud() {
               </div>
             )}
 
-            {/* Pago */}
-            <div className="card detalle-card">
-              <h3 className="detalle-card-titulo">💳 Información de Pago</h3>
-              {sol.idPago ? <>
-                <div className="detalle-fila"><span>Monto</span><strong>Bs {sol.monto}</strong></div>
-                <div className="detalle-fila"><span>Método</span><strong>{sol.metodo}</strong></div>
-                <div className="detalle-fila"><span>Estado pago</span>
-                  <span className={`badge ${sol.estado_pago === 'pagado' ? 'aceptado' : sol.estado_pago === 'devuelto' ? 'rechazado' : 'pendiente'}`}>
-                    {sol.estado_pago}
-                  </span>
-                </div>
-                {sol.comp_numero && <>
-                  <div className="detalle-fila"><span>Comprobante</span><strong>{sol.comp_numero}</strong></div>
-                  {sol.comp_url && (
-                    <div className="detalle-fila">
-                      <span>Enlace</span>
-                      <a href={sol.comp_url} target="_blank" rel="noopener noreferrer"
-                        style={{ color: 'var(--azul-brillante)', fontSize: 13 }}>Ver comprobante ↗</a>
-                    </div>
-                  )}
-                </>}
-              </> : (
-                <p style={{ color: 'var(--gris-texto)', fontSize: 14 }}>Sin información de pago.</p>
-              )}
-            </div>
-
+            
             {/* Acciones según rol */}
             {sol.estado === 'pendiente' && !location.pathname.startsWith('/autoridad') && (
               <div className="card detalle-card detalle-acciones">
@@ -207,19 +194,19 @@ export default function DetalleSolicitud() {
                   <div className="doc-preview">
                     <div className="doc-preview-bar">
                       <span>{icono(docActivo.tipo)} {docActivo.nombre}</span>
-                      <a href={`/uploads/${docActivo.nombre}`} target="_blank" rel="noopener noreferrer"
+                      <a href={urlDocumento(docActivo)} target="_blank" rel="noopener noreferrer"
                         className="btn btn-ghost btn-sm">↗ Abrir</a>
                     </div>
                     {docActivo.tipo?.startsWith('image/') && (
-                      <img src={`/uploads/${docActivo.nombre}`} alt={docActivo.nombre} className="doc-preview-img" />
+                      <img src={urlDocumento(docActivo)} alt={docActivo.nombre} className="doc-preview-img" />
                     )}
                     {docActivo.tipo?.includes('pdf') && (
-                      <iframe src={`/uploads/${docActivo.nombre}`} title={docActivo.nombre} className="doc-preview-iframe" />
+                      <iframe src={urlDocumento(docActivo)} title={docActivo.nombre} className="doc-preview-iframe" />
                     )}
                     {!docActivo.tipo?.startsWith('image/') && !docActivo.tipo?.includes('pdf') && (
                       <div className="doc-no-preview">
                         <p>Vista previa no disponible.</p>
-                        <a href={`/uploads/${docActivo.nombre}`} target="_blank" rel="noopener noreferrer"
+                        <a href={urlDocumento(docActivo)} target="_blank" rel="noopener noreferrer"
                           className="btn btn-primary btn-sm">Descargar</a>
                       </div>
                     )}
