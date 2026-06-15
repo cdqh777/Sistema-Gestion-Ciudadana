@@ -4,24 +4,115 @@ const db      = require('../config/db');
 const { verificarToken, soloFuncionario, soloAutoridad } = require('../middleware/auth');
 const upload  = require('../middleware/upload');
 
+
+const columnasCache = new Map();
+
+async function obtenerColumnas(nombreTabla) {
+  const tabla = String(nombreTabla || '').replace(/[^a-zA-Z0-9_]/g, '');
+  if (!tabla) return new Set();
+  if (columnasCache.has(tabla)) return columnasCache.get(tabla);
+
+  try {
+    const [rows] = await db.execute(`SHOW COLUMNS FROM \`${tabla}\``);
+    const columnas = new Set(rows.map(columna => columna.Field));
+    columnasCache.set(tabla, columnas);
+    return columnas;
+  } catch (error) {
+    console.warn(`No se pudieron leer columnas de ${tabla}:`, error.message);
+    const columnas = new Set();
+    columnasCache.set(tabla, columnas);
+    return columnas;
+  }
+}
+
+async function existeTabla(nombreTabla) {
+  const tabla = String(nombreTabla || '').replace(/[^a-zA-Z0-9_]/g, '');
+  if (!tabla) return false;
+
+  try {
+    const [rows] = await db.execute('SHOW TABLES LIKE ?', [tabla]);
+    return rows.length > 0;
+  } catch (error) {
+    return false;
+  }
+}
+
+function normalizarTipoTramite(tramite) {
+  const texto = `${tramite.tipo_tramite || ''} ${tramite.nombre || ''} ${tramite.descripcion || ''}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (texto.includes('convenio') || texto.includes('interinstitucional') || texto.includes('cooperacion')) {
+    return 'convenio';
+  }
+
+  if (
+    texto.includes('umsa') ||
+    texto.includes('universidad') ||
+    texto.includes('universitario') ||
+    texto.includes('academico') ||
+    texto.includes('legalizacion') ||
+    texto.includes('certificado de notas') ||
+    texto.includes('matricula') ||
+    texto.includes('kardex') ||
+    texto.includes('diploma') ||
+    texto.includes('titulo') ||
+    texto.includes('practica') ||
+    texto.includes('carnet municipal universitario')
+  ) {
+    return 'umsa';
+  }
+
+  return 'municipal';
+}
+
+function construirInsertDinamico(tabla, campos) {
+  const columnas = [];
+  const marcas = [];
+  const valores = [];
+
+  for (const campo of campos) {
+    columnas.push(campo.nombre);
+    marcas.push(campo.sql || '?');
+    if (!campo.sql) valores.push(campo.valor);
+  }
+
+  return {
+    sql: `INSERT INTO ${tabla} (${columnas.join(', ')}) VALUES (${marcas.join(', ')})`,
+    valores,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CATÁLOGO PÚBLICO
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/tramites/catalogo
 router.get('/catalogo', async (req, res) => {
   try {
+    const columnasTramite = await obtenerColumnas('TRAMITE');
+    const tieneTipoTramite = columnasTramite.has('tipo_tramite');
+
+    const campoTipo = tieneTipoTramite ? 't.tipo_tramite' : "'municipal' AS tipo_tramite";
+
     const [rows] = await db.execute(
       `SELECT t.idTramite, t.nombre, t.descripcion, t.requisitos, t.costo, t.estado,
-              t.fechaCreacion, t.tipo_tramite,
-              CONCAT(c.nombre,' ',c.apellido) AS funcionario_nombre,
+              t.fechaCreacion, ${campoTipo},
+              CONCAT(COALESCE(c.nombre,''),' ',COALESCE(c.apellido,'')) AS funcionario_nombre,
               f.cargo, f.departamento
        FROM TRAMITE t
-       JOIN FUNCIONARIO f ON t.ci_funcionario = f.ci
-       JOIN CIUDADANO   c ON f.ci = c.ci
-       WHERE t.estado = 'activo'
+       LEFT JOIN FUNCIONARIO f ON t.ci_funcionario = f.ci
+       LEFT JOIN CIUDADANO   c ON f.ci = c.ci
+       WHERE LOWER(t.estado) = 'activo'
        ORDER BY t.nombre`
     );
-    res.json(rows);
+
+    const tramites = rows.map(tramite => ({
+      ...tramite,
+      tipo_tramite: normalizarTipoTramite(tramite),
+    }));
+
+    res.json(tramites);
   } catch (err) {
     console.error(err);
     res.status(500).json({ mensaje: 'Error al obtener catálogo' });
@@ -111,12 +202,18 @@ router.delete('/:id', verificarToken, soloFuncionario, async (req, res) => {
 // GET /api/tramites/:id/flujo — obtener flujo de un trámite
 router.get('/:id/flujo', async (req, res) => {
   try {
+    const existeFlujo = await existeTabla('FLUJO_TRAMITE');
+    if (!existeFlujo) return res.json([]);
+
     const [rows] = await db.execute(
       'SELECT orden, institucion, accion, descripcion FROM FLUJO_TRAMITE WHERE idTramite=? ORDER BY orden',
       [req.params.id]
     );
     res.json(rows);
-  } catch (err) { console.error(err); res.status(500).json({ mensaje: 'Error al obtener flujo' }); }
+  } catch (err) {
+    console.error(err);
+    res.json([]);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,19 +235,46 @@ const consultaSolicitud = `
 router.get('/mis-solicitudes', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'ciudadano')
     return res.status(403).json({ mensaje: 'Solo para ciudadanos' });
+
   try {
+    const columnasSolicitud = await obtenerColumnas('SOLICITUD');
+    const columnasTramite = await obtenerColumnas('TRAMITE');
+
+    const tieneCiudadano = columnasSolicitud.has('ci_ciudadano');
+    const tieneInstitucion = columnasSolicitud.has('institucion_actual');
+    const tieneEstadoUmsa = columnasSolicitud.has('estado_umsa');
+    const tieneEstadoMunicipio = columnasSolicitud.has('estado_municipio');
+    const tieneTipoTramite = columnasTramite.has('tipo_tramite');
+
+    const selectInstitucion = tieneInstitucion ? 's.institucion_actual' : "'municipio' AS institucion_actual";
+    const selectEstadoUmsa = tieneEstadoUmsa ? 's.estado_umsa' : "'pendiente' AS estado_umsa";
+    const selectEstadoMunicipio = tieneEstadoMunicipio ? 's.estado_municipio' : "'pendiente' AS estado_municipio";
+    const selectTipo = tieneTipoTramite ? 't.tipo_tramite' : "'municipal' AS tipo_tramite";
+    const where = tieneCiudadano ? 'WHERE s.ci_ciudadano = ?' : '';
+    const params = tieneCiudadano ? [req.usuario.ci] : [];
+
     const [rows] = await db.execute(
       `SELECT s.idSolicitud, s.fechaSolicitud, s.estado, s.observacion,
-              s.institucion_actual, s.estado_umsa, s.estado_municipio,
-              t.idTramite, t.nombre AS tramite, t.costo, t.tipo_tramite
+              ${selectInstitucion}, ${selectEstadoUmsa}, ${selectEstadoMunicipio},
+              t.idTramite, t.nombre AS tramite, t.costo, ${selectTipo}
        FROM SOLICITUD s
        JOIN TRAMITE t ON s.idTramite = t.idTramite
-       WHERE s.ci_ciudadano = ?
+       ${where}
        ORDER BY s.fechaSolicitud DESC`,
-      [req.usuario.ci]
+      params
     );
-    res.json(rows);
-  } catch (err) { console.error(err); res.status(500).json({ mensaje: 'Error' }); }
+
+    res.json(rows.map(solicitud => ({
+      ...solicitud,
+      tipo_tramite: normalizarTipoTramite({
+        tipo_tramite: solicitud.tipo_tramite,
+        nombre: solicitud.tramite,
+      }),
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ mensaje: 'Error al obtener solicitudes' });
+  }
 });
 
 // GET /api/tramites/solicitudes — todas
@@ -318,31 +442,60 @@ router.post('/solicitudes', verificarToken, upload.array('documentos', 10), asyn
   try {
     await conn.beginTransaction();
 
+    const columnasTramite = await obtenerColumnas('TRAMITE');
+    const columnasSolicitud = await obtenerColumnas('SOLICITUD');
+    const tieneTipoTramite = columnasTramite.has('tipo_tramite');
+
     const [[tram]] = await conn.execute(
-      'SELECT * FROM TRAMITE WHERE idTramite=? AND estado="activo"', [idTramite]
+      `SELECT *, ${tieneTipoTramite ? 'tipo_tramite' : "'municipal' AS tipo_tramite"}
+       FROM TRAMITE WHERE idTramite=? AND LOWER(estado)='activo'`,
+      [idTramite]
     );
+
     if (!tram) {
       await conn.rollback();
       return res.status(404).json({ mensaje: 'Trámite no encontrado o inactivo' });
     }
 
+    tram.tipo_tramite = normalizarTipoTramite(tram);
     const instActual = tram.tipo_tramite === 'umsa' || tram.tipo_tramite === 'convenio' ? 'umsa' : 'municipio';
 
-    // Crear solicitud
-    const [sRes] = await conn.execute(
-      `INSERT INTO SOLICITUD (fechaSolicitud, estado, observacion, idTramite, ci_ciudadano,
-        institucion_origen, institucion_actual, estado_umsa, estado_municipio)
-       VALUES (CURDATE(), 'pendiente', NULL, ?, ?, 'ciudadano', ?, 'pendiente', 'pendiente')`,
-      [idTramite, req.usuario.ci, instActual]
-    );
+    const camposSolicitud = [
+      { nombre: 'fechaSolicitud', sql: 'CURDATE()' },
+      { nombre: 'estado', valor: 'pendiente' },
+      { nombre: 'observacion', valor: null },
+      { nombre: 'idTramite', valor: idTramite },
+    ];
+
+    if (columnasSolicitud.has('ci_ciudadano')) {
+      camposSolicitud.push({ nombre: 'ci_ciudadano', valor: req.usuario.ci });
+    }
+
+    if (columnasSolicitud.has('institucion_origen')) {
+      camposSolicitud.push({ nombre: 'institucion_origen', valor: 'ciudadano' });
+    }
+
+    if (columnasSolicitud.has('institucion_actual')) {
+      camposSolicitud.push({ nombre: 'institucion_actual', valor: instActual });
+    }
+
+    if (columnasSolicitud.has('estado_umsa')) {
+      camposSolicitud.push({ nombre: 'estado_umsa', valor: 'pendiente' });
+    }
+
+    if (columnasSolicitud.has('estado_municipio')) {
+      camposSolicitud.push({ nombre: 'estado_municipio', valor: 'pendiente' });
+    }
+
+    const insertSolicitud = construirInsertDinamico('SOLICITUD', camposSolicitud);
+    const [sRes] = await conn.execute(insertSolicitud.sql, insertSolicitud.valores);
     const idSolicitud = sRes.insertId;
 
-    // Registrar documentos adjuntos
     for (const archivo of (req.files || [])) {
       const [dRes] = await conn.execute(
         `INSERT INTO DOCUMENTO (nombre, tipo, fechaEmision, estado)
          VALUES (?, ?, CURDATE(), 'generado')`,
-        [archivo.originalname, archivo.mimetype]
+        [archivo.filename, archivo.mimetype]
       );
       await conn.execute(
         'INSERT INTO PRODUCE (idSolicitud, idDoc) VALUES (?,?)',
@@ -350,11 +503,10 @@ router.post('/solicitudes', verificarToken, upload.array('documentos', 10), asyn
       );
     }
 
-    // Crear registro de pago pendiente
     await conn.execute(
       `INSERT INTO PAGO (monto, fecha, metodo, estado, idSolicitud)
        VALUES (?, CURDATE(), 'pendiente', 'pendiente', ?)`,
-      [tram.costo, idSolicitud]
+      [tram.costo || 0, idSolicitud]
     );
 
     await conn.commit();
@@ -362,7 +514,7 @@ router.post('/solicitudes', verificarToken, upload.array('documentos', 10), asyn
   } catch (err) {
     await conn.rollback();
     console.error(err);
-    res.status(500).json({ mensaje: 'Error al crear solicitud' });
+    res.status(500).json({ mensaje: 'Error al crear solicitud', detalle: err.message });
   } finally {
     conn.release();
   }

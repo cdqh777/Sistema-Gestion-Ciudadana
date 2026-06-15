@@ -70,12 +70,7 @@ export default function DashboardFuncionario() {
             <h1 className="dash-titulo">Panel del Funcionario</h1>
             <p className="dash-sub">Bienvenido, <strong>{usuario?.nombre}</strong> — {usuario?.rol}</p>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Link to="/funcionario/tramites" className="btn btn-ghost">⚙️ Gestionar Trámites</Link>
-            <span className="dash-fecha">
-              {new Date().toLocaleDateString('es-BO', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
-            </span>
-          </div>
+          
         </div>
 
         {/* KPIs */}

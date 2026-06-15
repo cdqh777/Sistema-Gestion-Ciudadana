@@ -45,7 +45,6 @@ export default function Header() {
           {/* ── ROL: funcionario ── */}
           {usuario?.rol === 'funcionario' && <>
             <Link to="/funcionario"          className={activo('/funcionario')}>📥 Solicitudes</Link>
-            <Link to="/funcionario/tramites" className={activo('/funcionario/tramites')}>⚙️ Trámites</Link>
             <Link to="/gestor-umsa/convenios" className={activo('/gestor-umsa/convenios')}>🤝 Convenios</Link>
             <Link to="/funcionario/reporte"  className={activo('/funcionario/reporte')}>📊 Reporte</Link>
           </>}
